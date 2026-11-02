@@ -1,6 +1,6 @@
 # AWS demo deployment
 
-Live site: [novai-companies.usamaaslam.site](https://novai-companies.usamaaslam.site). Source: [U7ama/novai-companies](https://github.com/U7ama/novai-companies) (private).
+Live site: [novai-companies.usamaaslam.site](https://novai-companies.usamaaslam.site). Source: [U7ama/novai-companies](https://github.com/U7ama/novai-companies).
 
 The CloudFormation stack is `novai-companies-serverless` in `us-east-1`. It manages the `novai-companies-web` function, the `novai-companies-state` table, and CloudFront distribution `E1QC0C9L6ZNWS4`.
 
