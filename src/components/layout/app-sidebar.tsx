@@ -41,16 +41,24 @@ export default function AppSidebar() {
 
   return (
     <Sidebar collapsible='icon'>
-      <SidebarHeader className='h-14 flex items-center px-4 border-b'>
-        <div className='flex items-center gap-3'>
-          <div className='flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground'>
-            <Icons.logo className='size-4' />
-          </div>
-          <div className='grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden'>
-            <span className='truncate font-semibold'>Novai</span>
-            <span className='truncate text-xs text-muted-foreground'>CRM Companies</span>
-          </div>
-        </div>
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              size='lg'
+              render={<Link href='/companies' aria-label='Novai CRM Companies' />}
+              className='hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+            >
+              <div className='flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground'>
+                <Icons.logo className='size-4' />
+              </div>
+              <div className='grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden'>
+                <span className='truncate font-semibold'>Novai</span>
+                <span className='truncate text-xs text-muted-foreground'>CRM Companies</span>
+              </div>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
       <SidebarContent className='overflow-x-hidden'>
         {filteredGroups.map((group) => (

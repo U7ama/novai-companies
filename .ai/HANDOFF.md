@@ -13,6 +13,12 @@
 5. **URL-Synchronized Table**: Search (`q`), status (`status`), sort (`sort`), and pagination (`page`) synced via `nuqs` `useQueryStates`. Table skeleton, empty state, error with retry.
 6. **Accessible Sheet Drawer & Concurrency UX**: Create and edit slide-over drawer with keyboard trap and ARIA semantics. Keyed form component preventing `set-state-in-effect`. Zero-draft-loss 409 conflict handling with "Reload latest version" and "Simulate Concurrent Edit" testing helper.
 7. **Documentation**: Production-grade `README.md`, detailed `ARCHITECTURE.md`, and `ANSWERS.md` answering all 9 core engineering design questions from Part 1 of the assessment.
+8. **Cross-Screen UI Fixes & Browser Verification**:
+   - Resolved sidebar header alignment: integrated `SidebarMenuButton` (`size="lg"`) so logo and "Novai CRM Companies" left-align at `16px` with nav items instead of floating horizontally centered.
+   - Refined `CompaniesToolbar` responsiveness (`md:flex-row`, `min-w-[200px]`, `w-full sm:w-44 shrink-0`), eliminating horizontal overflow on tablet view (768px).
+   - Optimized mobile drawer layout (`data-[side=right]:w-full sm:data-[side=right]:max-w-lg`) and vertically stacked footer buttons (`flex-col-reverse sm:flex-row`), eliminating mobile button text truncation.
+   - Localized breadcrumbs dynamically via `useLanguage()`.
+   - Hardened `AuthGuard` hydration mount check and added dual token key fallback.
 
 ## Checks Actually Run
 - `pnpm lint` (`oxlint`): **PASSED** (0 errors, 0 warnings across 112 files).

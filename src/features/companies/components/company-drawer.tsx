@@ -320,7 +320,7 @@ function CompanyForm({ company, isCreate, onClose }: CompanyFormProps) {
         )}
       </form>
 
-      <SheetFooter className='p-6 border-t bg-muted/10 flex flex-row items-center justify-end gap-2'>
+      <SheetFooter className='p-4 sm:p-6 border-t bg-muted/10 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2'>
         <Button type='button' variant='outline' onClick={onClose} disabled={isPending}>
           {t.drawer.cancel}
         </Button>
@@ -362,7 +362,7 @@ export function CompanyDrawer({ companyId, isCreate, onClose }: CompanyDrawerPro
     <Sheet open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <SheetContent
         side='right'
-        className='w-full sm:max-w-lg p-0 flex flex-col justify-between overflow-y-auto'
+        className='data-[side=right]:w-full sm:data-[side=right]:max-w-lg p-0 flex flex-col justify-between overflow-y-auto'
         aria-modal='true'
       >
         <SheetHeader className='p-6 border-b'>

@@ -2,22 +2,15 @@
 
 import { usePathname } from 'next/navigation';
 import { useMemo } from 'react';
-
-type BreadcrumbItem = {
-  title: string;
-  link: string;
-};
-
-const routeMapping: Record<string, BreadcrumbItem[]> = {
-  '/companies': [{ title: 'Companies', link: '/companies' }]
-};
+import { useLanguage } from '@/features/i18n/i18n-context';
 
 export function useBreadcrumbs() {
   const pathname = usePathname();
+  const { t } = useLanguage();
 
   const breadcrumbs = useMemo(() => {
-    if (routeMapping[pathname]) {
-      return routeMapping[pathname];
+    if (pathname === '/companies' || pathname.startsWith('/companies/')) {
+      return [{ title: t.companies, link: '/companies' }];
     }
 
     const segments = pathname.split('/').filter(Boolean);
@@ -28,7 +21,7 @@ export function useBreadcrumbs() {
         link: path
       };
     });
-  }, [pathname]);
+  }, [pathname, t.companies]);
 
   return breadcrumbs;
 }

@@ -36,9 +36,9 @@ export function CompaniesToolbar({
   const { t } = useLanguage();
 
   return (
-    <div className='flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4'>
-      <div className='flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-3 max-w-xl'>
-        <div className='relative flex-1'>
+    <div className='flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4'>
+      <div className='flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-3'>
+        <div className='relative flex-1 min-w-[200px]'>
           <Icons.search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none' />
           <Input
             type='search'
@@ -55,7 +55,7 @@ export function CompaniesToolbar({
           )}
         </div>
 
-        <div className='w-full sm:w-48'>
+        <div className='w-full sm:w-44 shrink-0'>
           <NativeSelect
             value={status}
             onChange={(e) => onStatusChange(e.target.value)}
@@ -72,8 +72,8 @@ export function CompaniesToolbar({
         </div>
       </div>
 
-      <div className='flex items-center gap-2'>
-        <Button onClick={onCreateClick} size='sm' className='h-9 font-medium'>
+      <div className='flex items-center gap-2 shrink-0'>
+        <Button onClick={onCreateClick} size='sm' className='h-9 font-medium whitespace-nowrap'>
           <Icons.add className='mr-1.5 h-4 w-4' />
           {t.drawer.create}
         </Button>
