@@ -118,7 +118,8 @@ novai-companies/
 │           ├── api/                 # Typed API client, query options, query keys
 │           ├── components/          # CompaniesView, Table, Toolbar, Drawer, Pagination
 │           └── types/               # TypeScript interfaces & Zod validation schemas
-├── ARCHITECTURE.md                  # Detailed architectural design answers (9 core questions)
+├── ANSWERS.md                       # Part 1: Written questions (9 assessment answers)
+├── ARCHITECTURE.md                  # Comprehensive architectural design document
 └── README.md
 ```
 

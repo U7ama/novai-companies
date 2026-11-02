@@ -12,7 +12,7 @@
 4. **Bilingual Localization (NL/EN)**: Native Dutch and English context with type-safe dictionaries in `translations.ts` and locale-aware `Intl.DateTimeFormat`.
 5. **URL-Synchronized Table**: Search (`q`), status (`status`), sort (`sort`), and pagination (`page`) synced via `nuqs` `useQueryStates`. Table skeleton, empty state, error with retry.
 6. **Accessible Sheet Drawer & Concurrency UX**: Create and edit slide-over drawer with keyboard trap and ARIA semantics. Keyed form component preventing `set-state-in-effect`. Zero-draft-loss 409 conflict handling with "Reload latest version" and "Simulate Concurrent Edit" testing helper.
-7. **Documentation**: Production-grade `README.md` and detailed `ARCHITECTURE.md` addressing all 9 core engineering design questions.
+7. **Documentation**: Production-grade `README.md`, detailed `ARCHITECTURE.md`, and `ANSWERS.md` answering all 9 core engineering design questions from Part 1 of the assessment.
 
 ## Checks Actually Run
 - `pnpm lint` (`oxlint`): **PASSED** (0 errors, 0 warnings across 112 files).
