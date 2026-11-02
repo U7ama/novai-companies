@@ -24,6 +24,7 @@ export type TranslationDictionary = {
     errorTitle: string;
     errorDescription: string;
     retry: string;
+    clearFilters: string;
   };
   pagination: {
     showing: string;
@@ -97,7 +98,8 @@ export const translations: Record<Locale, TranslationDictionary> = {
       emptyDescription: 'Try adjusting your search query or filters, or add a new company.',
       errorTitle: 'Failed to load companies',
       errorDescription: 'There was an error communicating with the API.',
-      retry: 'Retry'
+      retry: 'Retry',
+      clearFilters: 'Clear all filters'
     },
     pagination: {
       showing: 'Showing',
@@ -170,7 +172,8 @@ export const translations: Record<Locale, TranslationDictionary> = {
       emptyDescription: 'Pas uw zoekopdracht of filters aan, of voeg een nieuw bedrijf toe.',
       errorTitle: 'Fout bij het laden van bedrijven',
       errorDescription: 'Er is een fout opgetreden bij de communicatie met de API.',
-      retry: 'Opnieuw proberen'
+      retry: 'Opnieuw proberen',
+      clearFilters: 'Alle filters wissen'
     },
     pagination: {
       showing: 'Weergave',

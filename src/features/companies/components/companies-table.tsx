@@ -28,6 +28,8 @@ interface CompaniesTableProps {
   onSortChange: (newSort: string) => void;
   onRowClick: (company: Company) => void;
   onCreateClick: () => void;
+  hasActiveFilters?: boolean;
+  onClearFilters?: () => void;
 }
 
 export function CompaniesTable({
@@ -40,7 +42,9 @@ export function CompaniesTable({
   sort,
   onSortChange,
   onRowClick,
-  onCreateClick
+  onCreateClick,
+  hasActiveFilters,
+  onClearFilters
 }: CompaniesTableProps) {
   const { locale, t } = useLanguage();
 
@@ -158,10 +162,17 @@ export function CompaniesTable({
         </div>
         <h3 className='text-lg font-semibold text-foreground mb-1'>{t.table.emptyTitle}</h3>
         <p className='text-sm text-muted-foreground mb-4 max-w-md'>{t.table.emptyDescription}</p>
-        <Button onClick={onCreateClick} size='sm'>
-          <Icons.add className='mr-1.5 h-4 w-4' />
-          {t.drawer.create}
-        </Button>
+        <div className='flex items-center gap-2'>
+          {hasActiveFilters && onClearFilters && (
+            <Button onClick={onClearFilters} variant='outline' size='sm'>
+              {t.table.clearFilters}
+            </Button>
+          )}
+          <Button onClick={onCreateClick} size='sm'>
+            <Icons.add className='mr-1.5 h-4 w-4' />
+            {t.drawer.create}
+          </Button>
+        </div>
       </div>
     );
   }

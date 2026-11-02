@@ -129,6 +129,8 @@ export function CompaniesView() {
         onSortChange={handleSortChange}
         onRowClick={handleRowClick}
         onCreateClick={handleCreateClick}
+        hasActiveFilters={Boolean(params.q || (params.status && params.status !== 'all'))}
+        onClearFilters={() => void setParams({ q: null, status: null, page: 1 })}
       />
 
       {total > 0 && (

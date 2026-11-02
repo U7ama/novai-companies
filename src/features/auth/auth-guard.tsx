@@ -29,12 +29,12 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const isClient = useSyncExternalStore(emptySubscribe, () => true, () => false);
 
   useEffect(() => {
-    if (isClient && !token && !getAuthToken()) {
+    if (isClient && !token) {
       router.replace('/sign-in');
     }
   }, [isClient, token, router]);
 
-  if (!token && !getAuthToken()) {
+  if (!isClient || !token) {
     return (
       <div className='flex h-screen w-screen items-center justify-center bg-background'>
         <div className='h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent' />
