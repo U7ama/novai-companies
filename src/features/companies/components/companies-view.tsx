@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useQueryState, parseAsString, parseAsInteger, parseAsBoolean } from 'nuqs';
+import { useQueryState, useQueryStates, parseAsString, parseAsInteger, parseAsBoolean } from 'nuqs';
 import { useQuery } from '@tanstack/react-query';
 import { Heading } from '@/components/ui/heading';
 import { useLanguage } from '@/features/i18n/i18n-context';
@@ -17,24 +17,37 @@ const PAGE_SIZE = 20;
 export function CompaniesView() {
   const { t } = useLanguage();
 
-  // URL state persistence via nuqs
-  const [q, setQ] = useQueryState('q', parseAsString.withDefault('').withOptions({ shallow: true }));
-  const [status, setStatus] = useQueryState('status', parseAsString.withDefault('all').withOptions({ shallow: true }));
-  const [sort, setSort] = useQueryState('sort', parseAsString.withDefault('-created_at').withOptions({ shallow: true }));
-  const [page, setPage] = useQueryState('page', parseAsInteger.withDefault(1).withOptions({ shallow: true }));
-  const [companyId, setCompanyId] = useQueryState('companyId', parseAsString.withDefault('').withOptions({ shallow: true }));
-  const [create, setCreate] = useQueryState('create', parseAsBoolean.withDefault(false).withOptions({ shallow: true }));
+  // URL state persistence via nuqs useQueryStates (atomic updates)
+  const [params, setParams] = useQueryStates(
+    {
+      q: parseAsString.withDefault(''),
+      status: parseAsString.withDefault('all'),
+      sort: parseAsString.withDefault('-created_at'),
+      page: parseAsInteger.withDefault(1)
+    },
+    { shallow: true }
+  );
+
+  // Drawer state
+  const [companyId, setCompanyId] = useQueryState(
+    'companyId',
+    parseAsString.withDefault('').withOptions({ shallow: true })
+  );
+  const [create, setCreate] = useQueryState(
+    'create',
+    parseAsBoolean.withDefault(false).withOptions({ shallow: true })
+  );
 
   // Convert URL state to API query parameters
-  const offset = (Math.max(1, page) - 1) * PAGE_SIZE;
-  const statusParam = status === 'all' ? undefined : (status as CompanyStatus);
+  const offset = (Math.max(1, params.page) - 1) * PAGE_SIZE;
+  const statusParam = params.status === 'all' ? undefined : (params.status as CompanyStatus);
 
   const queryParams = {
     limit: PAGE_SIZE,
     offset,
-    q: q || undefined,
+    q: params.q || undefined,
     status: statusParam,
-    sort: sort || undefined
+    sort: params.sort || undefined
   };
 
   const {
@@ -49,26 +62,24 @@ export function CompaniesView() {
   const companies = data?.items ?? [];
   const total = data?.total ?? 0;
 
-  // Search input handler - resets to page 1
+  // Search input handler - resets to page 1 atomically
   const handleSearchChange = (value: string) => {
-    void setQ(value || null);
-    void setPage(1);
+    void setParams({ q: value || null, page: 1 });
   };
 
-  // Status filter handler - resets to page 1
+  // Status filter handler - resets to page 1 atomically
   const handleStatusChange = (newStatus: string) => {
-    void setStatus(newStatus === 'all' ? null : newStatus);
-    void setPage(1);
+    void setParams({ status: newStatus === 'all' ? null : newStatus, page: 1 });
   };
 
-  // Sort handler - keeps current page or resets to 1
+  // Sort handler
   const handleSortChange = (newSort: string) => {
-    void setSort(newSort === '-created_at' ? null : newSort);
+    void setParams({ sort: newSort === '-created_at' ? null : newSort });
   };
 
   // Page change handler
   const handlePageChange = (newPage: number) => {
-    void setPage(newPage === 1 ? null : newPage);
+    void setParams({ page: newPage === 1 ? null : newPage });
   };
 
   // Row click -> opens drawer in edit mode
@@ -99,9 +110,9 @@ export function CompaniesView() {
       </div>
 
       <CompaniesToolbar
-        search={q}
+        search={params.q}
         onSearchChange={handleSearchChange}
-        status={status}
+        status={params.status}
         onStatusChange={handleStatusChange}
         onCreateClick={handleCreateClick}
         isFetching={isFetching && !isLoading}
@@ -114,7 +125,7 @@ export function CompaniesView() {
         isError={isError}
         errorMessage={error instanceof Error ? error.message : undefined}
         onRetry={() => refetch()}
-        sort={sort}
+        sort={params.sort}
         onSortChange={handleSortChange}
         onRowClick={handleRowClick}
         onCreateClick={handleCreateClick}
@@ -125,7 +136,7 @@ export function CompaniesView() {
           total={total}
           limit={PAGE_SIZE}
           offset={offset}
-          page={page}
+          page={params.page}
           onPageChange={handlePageChange}
           disabled={isFetching}
         />
