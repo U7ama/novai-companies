@@ -30,25 +30,26 @@ yarn-error.log*
 .env*
 .env*.local
 
-# vercel
-.vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 
 .idea/
-# clerk configuration (can include secrets)
-/.clerk/
 
 
 # cursor 
 .cursorrules
 /memory-bank
 
-# Sentry Config File
-.env.sentry-build-plugin
 
 # AWS deployment build output
 /.next-lambda/
 /.aws-build/
+
+# Local workspace instructions and installed agent skills
+/.ai/
+/.agents/
+/.claude/
+/.codex/
+/skills-lock.json

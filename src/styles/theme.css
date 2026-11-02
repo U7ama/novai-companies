@@ -1,5 +1,5 @@
 /* Import active theme */
-@import './themes/vercel.css';
+@import './themes/novai.css';
 
 body {
   @apply overscroll-none;
@@ -9,7 +9,7 @@ body {
   --header-height: calc(var(--spacing, 0.25rem) * 12 + 1px);
 }
 
-/* Apply theme fonts to body for all themes */
+/* System fonts keep the build independent of font downloads. */
 [data-theme] body {
   --font-sans: ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, monospace;

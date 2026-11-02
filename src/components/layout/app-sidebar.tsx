@@ -21,7 +21,6 @@ import {
   SidebarRail
 } from '@/components/ui/sidebar';
 import { navGroups } from '@/config/nav-config';
-import { useFilteredNavGroups } from '@/hooks/use-nav';
 import type { NavItem } from '@/types';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -39,7 +38,6 @@ function handleSignOut() {
 export default function AppSidebar() {
   const { t } = useLanguage();
   const pathname = usePathname();
-  const filteredGroups = useFilteredNavGroups(navGroups);
 
   return (
     <Sidebar collapsible='icon'>
@@ -63,7 +61,7 @@ export default function AppSidebar() {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent className='overflow-x-hidden'>
-        {filteredGroups.map((group) => (
+        {navGroups.map((group) => (
           <SidebarGroup key={group.label || 'ungrouped'} className='py-0'>
             {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
             <SidebarMenu>
@@ -135,26 +133,6 @@ function NavMainItem({ item, pathname }: { item: NavItem; pathname: string }) {
   const isActive =
     pathname === item.url || (item.url !== '/' && pathname.startsWith(`${item.url}/`));
 
-  if (item.disabled) {
-    return (
-      <SidebarMenuItem>
-        <SidebarMenuButton
-          tooltip={item.title}
-          disabled
-          className='opacity-50 cursor-not-allowed select-none'
-        >
-          <Icon />
-          <span>{item.title}</span>
-          {item.label && (
-            <span className='ml-auto rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground group-data-[collapsible=icon]:hidden'>
-              {item.label}
-            </span>
-          )}
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    );
-  }
-
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
@@ -164,11 +142,6 @@ function NavMainItem({ item, pathname }: { item: NavItem; pathname: string }) {
       >
         <Icon />
         <span>{item.title}</span>
-        {item.label && (
-          <span className='ml-auto rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground group-data-[collapsible=icon]:hidden'>
-            {item.label}
-          </span>
-        )}
       </SidebarMenuButton>
     </SidebarMenuItem>
   );
