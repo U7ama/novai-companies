@@ -42,11 +42,24 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              try {
-                if (localStorage.theme === 'dark' || ((!('theme' in localStorage) || localStorage.theme === 'system') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '${META_THEME_COLORS.dark}')
-                }
-              } catch (_) {}
+              (function() {
+                try {
+                  var t = localStorage.getItem('theme');
+                  var supportDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  var isDark = t === 'dark' || ((!t || t === 'system') && supportDark);
+                  if (isDark) {
+                    document.documentElement.classList.add('dark');
+                    document.documentElement.style.colorScheme = 'dark';
+                  } else {
+                    document.documentElement.classList.remove('dark');
+                    document.documentElement.style.colorScheme = 'light';
+                  }
+                  var meta = document.querySelector('meta[name="theme-color"]');
+                  if (meta) {
+                    meta.setAttribute('content', isDark ? '${META_THEME_COLORS.dark}' : '${META_THEME_COLORS.light}');
+                  }
+                } catch (e) {}
+              })();
             `
           }}
         />
