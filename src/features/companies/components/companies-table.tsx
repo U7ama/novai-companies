@@ -105,7 +105,7 @@ export function CompaniesTable({
   // Initial loading skeleton
   if (isLoading && companies.length === 0) {
     return (
-      <div className='rounded-md border' role='status' aria-label='Loading companies'>
+      <div className='rounded-md border' role='status' aria-label={t.table.loading}>
         <Table>
           <TableHeader>
             <TableRow>
@@ -118,10 +118,18 @@ export function CompaniesTable({
           <TableBody>
             {[...Array(6)].map((_, i) => (
               <TableRow key={i}>
-                <TableCell><Skeleton className='h-5 w-40' /></TableCell>
-                <TableCell><Skeleton className='h-5 w-28' /></TableCell>
-                <TableCell><Skeleton className='h-5 w-20' /></TableCell>
-                <TableCell><Skeleton className='h-5 w-24' /></TableCell>
+                <TableCell>
+                  <Skeleton className='h-5 w-40' />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className='h-5 w-28' />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className='h-5 w-20' />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className='h-5 w-24' />
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -182,7 +190,7 @@ export function CompaniesTable({
       {isFetching && (
         <div
           role='progressbar'
-          aria-label='Updating company data'
+          aria-label={t.table.updating}
           className='absolute inset-x-0 top-0 h-0.5 bg-primary animate-pulse z-10'
         />
       )}
@@ -208,13 +216,9 @@ export function CompaniesTable({
               </div>
             </TableHead>
 
-            <TableHead className='font-semibold w-[25%]'>
-              {t.table.domain}
-            </TableHead>
+            <TableHead className='font-semibold w-[25%]'>{t.table.domain}</TableHead>
 
-            <TableHead className='font-semibold w-[20%]'>
-              {t.table.status}
-            </TableHead>
+            <TableHead className='font-semibold w-[20%]'>{t.table.status}</TableHead>
 
             <TableHead
               aria-sort={getAriaSort('created_at')}
@@ -240,7 +244,6 @@ export function CompaniesTable({
           {companies.map((company) => (
             <TableRow
               key={company.id}
-              role='button'
               tabIndex={0}
               onClick={() => onRowClick(company)}
               onKeyDown={(e) => {
@@ -251,25 +254,17 @@ export function CompaniesTable({
               }}
               className='cursor-pointer hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:outline-none transition-colors'
             >
-              <TableCell className='font-medium text-foreground py-3.5'>
-                {company.name}
-              </TableCell>
+              <TableCell className='font-medium text-foreground py-3.5'>{company.name}</TableCell>
 
               <TableCell className='text-muted-foreground py-3.5'>
                 {company.domain ? (
-                  <span className='font-mono text-xs text-foreground/80'>
-                    {company.domain}
-                  </span>
+                  <span className='font-mono text-xs text-foreground/80'>{company.domain}</span>
                 ) : (
-                  <span className='text-muted-foreground/60 text-xs italic'>
-                    —
-                  </span>
+                  <span className='text-muted-foreground/60 text-xs italic'>—</span>
                 )}
               </TableCell>
 
-              <TableCell className='py-3.5'>
-                {renderStatusBadge(company.status)}
-              </TableCell>
+              <TableCell className='py-3.5'>{renderStatusBadge(company.status)}</TableCell>
 
               <TableCell className='text-muted-foreground text-xs py-3.5'>
                 {formatDate(company.created_at, locale)}

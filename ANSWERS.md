@@ -1,109 +1,45 @@
-# Next.js Developer Assessment — Part 1: Written Questions
+# Part 1: Written answers
 
-### 1. In the App Router, when do you make a component a Server Component and when a Client Component? Give one example of each from a typical CRM screen (a filterable table with a detail drawer) and explain the boundary you would draw.
+## 1. Server and Client Components
 
-**Boundary & Rule of Thumb**: Default to Server Components for layout shells, static page scaffolding, and server-side authentication/metadata. Push the `"use client"` boundary as far down the component tree as possible, reserving Client Components strictly for interactive subtrees requiring browser APIs, state hooks (`useState`, `useQueryState`), event listeners, or client-side caching.
+I'd use Server Components for the page layout, metadata, and any work that needs server credentials. The search box, filters, and edit form need Client Components because they respond to input and hold local state. For example, `src/app/companies/page.tsx` is a Server Component, while `CompaniesView` is a Client Component containing the interactive table and drawer. I'd keep that boundary around the interactive part instead of making the whole app a Client Component.
 
-**CRM Example**:
-- **Server Component**: The page layout and top-level route container (`/companies/page.tsx`), providing static header titles, structural layout wrappers, and initial metadata.
-- **Client Component**: The interactive search toolbar, filter dropdowns, and detail drawer (`CompanyDrawer`), which bind to user keyboard input, toggle focus trapping, and maintain client-side draft edits.
-- **Boundary**: Wrap the table and drawer inside an interactive client feature container (`CompaniesView`), while keeping page headers, navigation shells, and metadata at the Server Component boundary.
+![Companies table with the company detail drawer open](docs/screenshots/companies-drawer.png)
 
----
+The table and drawer shown here belong to `CompaniesView`. The page and layout around them stay as Server Components.
 
-### 2. We fetch most data on the client with TanStack Query through a generated API client. When would you still fetch in a Server Component instead, and how would you hand that data to TanStack Query without fetching twice?
+## 2. Fetching on the server with TanStack Query
 
-**When to Fetch on the Server**: For the initial page view (e.g. Page 1 of the CRM table with default filters) to eliminate client-side loading spinners, avoid layout shift, improve Largest Contentful Paint (LCP), and render populated HTML for SEO or fast first-paint.
+I'd fetch on the server when having the first set of results in the initial HTML would noticeably improve the page load. I'd create a QueryClient for that request, prefetch with the same key the client uses, and pass the dehydrated cache through a HydrationBoundary. A suitable `staleTime` stops the client from immediately fetching the same data again. The server fetch also needs the user's token and a server-safe API URL; the browser client's relative URL won't work unchanged. I kept data loading on the client for this exercise.
 
-**Handoff without Double-Fetching**:
-1. Instantiate a request-scoped `QueryClient` on the server inside the Server Component.
-2. Prefetch the query using `await queryClient.prefetchQuery(listCompaniesOptions(defaultParams))`.
-3. Wrap the client child tree in `<HydrationBoundary state={dehydrate(queryClient)}>`.
-4. On the client, `useQuery(listCompaniesOptions(params))` immediately hydrates the prefetched data from cache synchronously without firing a duplicate initial network request, provided `staleTime` is set greater than zero.
+## 3. Handling a 409 conflict
 
----
+I'd keep the user's input and show a message explaining that someone else changed the record. Reloading should fetch the latest company into the query cache and update the version used for the next save, without replacing the form fields. If the user wants to discard their edits, that should be a separate action. The drawer implements both options, and a failed write does not update the cached company as though it succeeded.
 
-### 3. The API returns 409 Conflict when a record was changed by someone else between your read and your write. Describe how you would handle this in the UI, including what the user sees and what happens to the TanStack Query cache.
+![409 conflict warning with the edited company name still in the form](docs/screenshots/company-conflict.png)
 
-**UI & User Experience**:
-- Never discard or blow away the user's typed changes.
-- Display an inline warning banner (`role="alert"`) inside the drawer stating: *"This record was modified by another user while you were editing."*
-- Provide an explicit **"Reload latest version"** action alongside the user's existing input. Clicking this action fetches the latest server version and updates the internal `if_version` baseline to match the latest server version without clearing the user's unsaved draft, allowing them to review discrepancies and re-submit.
+Here, the edited name stays in the form after the save returns 409. Reloading the version lets the user retry without typing it again.
 
-**TanStack Query Cache**:
-- Do **not** optimistically update or overwrite the cache on a failed 409 mutation.
-- When the user clicks "Reload latest version" (or when 409 is received), invalidate or re-fetch `companiesKeys.detail(id)` to update the background query cache with the true server state while keeping the local form state intact.
+## 4. Filters, sorting, pagination, and the URL
 
----
+I'd store these in the URL so the view can be bookmarked, refreshed, and restored with Back or Forward. Here, nuqs manages the parameters and pushes history entries when they change. The list query key uses the same values sent to the API: search, status, sort, limit, and the offset calculated from the page. That keeps the URL, request, and cache in sync.
 
-### 4. A list screen has filters, sorting and pagination. Where does that state live, how does it survive a page refresh and the browser back button, and how do you keep it in sync with the query key?
+## 5. Access tokens and expired sessions
 
-**Where State Lives**: All filter, sorting, and pagination parameters live in the **URL search parameters** (managed via `nuqs` with shallow routing).
+I'd attach the bearer token in one request helper so individual components don't have to handle it. On a 401, that helper can try a refresh if the identity provider supports it; otherwise it should clear the session and send the user to sign-in. Tokens must stay out of URLs, logs, error reports, and source control. The exercise uses fake tokens stored in the browser; for production, I'd prefer a server-side session with an HttpOnly cookie and a proxy that forwards the access token.
 
-**Surviving Refresh & Back Button**: Because state is serialized directly into the URL (`?q=asml&status=qualified&sort=-created_at&page=2`), page refreshes, direct bookmarks, and browser forward/back history naturally restore the exact view state from the query string.
+## 6. Loading, error, and empty states
 
-**Sync with Query Key**: The query key factory mirrors the URL parameters directly: `companiesKeys.list({ q, status, sort, page })`. Whenever `useQueryStates` updates URL parameters, React re-renders, generating a new deterministic query key tuple that TanStack Query immediately consumes to fetch or retrieve cached results.
+I'd keep the table and drawer independent so a failed detail request doesn't hide the list or navigation. `loading.tsx` can cover route loading, while separate Suspense boundaries are useful if the table and drawer use suspending queries. For ordinary `useQuery`, I'd render loading, retry, and empty states from the query result, which is what this build does. `keepPreviousData` keeps the existing rows visible while filters load; a 404 in the drawer gets its own not-found message. An unexpected rendering error can still be caught by an error boundary around the affected area.
 
----
+## 7. Dutch and English
 
-### 5. How do you attach the user's access token to requests from a typed client that is shared between many components, and how do you handle the token expiring mid-session? Where must the token never end up?
+For an app that must ship only one language, I'd put the locale in the route or a cookie that the server can read. The server would load only that dictionary and pass the strings needed by Client Components through a provider. I'd use the same locale for `Intl.DateTimeFormat` and `Intl.NumberFormat` to avoid differences between server and client output. This small build bundles both dictionaries for a simple language toggle; I'd split them as the app grows.
 
-**Attaching the Token**: Through a centralized HTTP request interceptor or client wrapper (e.g. `request()` helper in `api/client.ts`), reading the token from a secure auth store and setting `headers.set('Authorization', \`Bearer \${token}\`)` on every outbound request.
+## 8. Investigating a slow page
 
-**Handling Mid-Session Expiration**:
-- Intercept HTTP `401 Unauthorized` responses in the client wrapper.
-- Attempt a silent refresh token exchange if supported by the identity provider; if refresh fails or is unsupported, clear local authentication state and redirect the user to `/sign-in?from=\${encodeURIComponent(currentPath)}`.
+I'd first check whether the delay comes from the server response, API requests, JavaScript loading, hydration, or rendering after an interaction. TTFB, LCP, and INP help locate the problem, and the network panel and React Profiler help explain it. Two App Router features I'd consider are streaming with Suspense, to show the page shell while slower sections load, and server caching or revalidation for data that can safely be reused. I'd be careful with caching authenticated data: the cache must respect organization boundaries and permissions.
 
-**Where the Token Must NEVER End Up**:
-- Never in URL search parameters or hash fragments (leaked via server logs and `Referer` headers).
-- Never in public source control, application telemetry, or client error logging payloads (e.g. Sentry error breadcrumbs).
-- Never in client-rendered HTML attributes or unencrypted storage exposed to third-party scripts (HttpOnly, SameSite cookies are the preferred production standard over raw `localStorage`).
+## 9. Testing approach
 
----
-
-### 6. Explain how you would structure loading, error and empty states for a page that has a table and a side drawer, using the App Router's file conventions and React Suspense. What should and should not be wrapped in a boundary?
-
-**File Conventions vs. Suspense Boundaries**:
-- Use App Router's `loading.tsx` only for the coarse, top-level route transition.
-- Wrap the table body in an isolated `<Suspense fallback={<TableSkeleton />}>` or handle loading inside the table component using `isFetching && keepPreviousData`, so that applying filters does not tear down the table header or search toolbar.
-- Wrap the table area in a React `ErrorBoundary` with a retry callback so that a table query failure shows an inline error state rather than crashing the global dashboard layout.
-- The **side drawer must be isolated in its own Suspense / Error boundary** separate from the table. A failure loading company details in the drawer should display an error within the drawer and must **never** take down the underlying table or navigation shell.
-
----
-
-### 7. The interface is in Dutch and English. How would you organise translations in the App Router so that server-rendered text, client components and dates/numbers all respect the selected language, without shipping both languages to the client?
-
-**Organization Strategy**:
-- **Route-Based Locale Structure**: Use an App Router dynamic segment `[locale]` (e.g. `/nl/companies` vs `/en/companies`) or a server cookie/header detected in middleware.
-- **Dynamic Imports**: Load only the active locale dictionary asynchronously on the server (`import(\`@/messages/\${locale}.json\`)`) and pass only that language's strings to client components through a lightweight Context provider, avoiding shipping the unused language bundle over the wire.
-- **Dates & Numbers**: Format all timestamps and currencies using standard `Intl.DateTimeFormat(locale, ...)` and `Intl.NumberFormat(locale, ...)`, ensuring date conventions (e.g. `15 jan 2024, 09:30` in Dutch vs `Jan 15, 2024, 9:30 AM` in English) respect the active locale automatically.
-
----
-
-### 8. What do you measure before calling a Next.js page "slow", and name two App Router features you would reach for to improve a slow data-heavy page.
-
-**What to Measure (Core Web Vitals & Metrics)**:
-1. **TTFB (Time to First Byte)**: Server response and database latency before streaming begins.
-2. **LCP (Largest Contentful Paint)**: Time until the main data table or primary content is visually rendered (< 2.5s is good).
-3. **INP (Interaction to Next Paint)**: UI responsiveness when clicking filters, sorting, or opening drawers (< 200ms).
-4. **Hydration / Total Blocking Time (TBT)**: Client CPU execution delay before interactive handlers respond.
-
-**Two App Router Features to Improve a Slow Data-Heavy Page**:
-1. **React Server Components with Streaming (`Suspense`)**: Stream static layout chrome and table skeletons instantly while the server awaits slow database queries in parallel, unblocking TTFB.
-2. **Partial Prerendering (PPR) / Incremental Static Regeneration (ISR) with Cache Tags**: Serve static layout shells from edge CDN cache while dynamically injecting tenant data with fine-grained `unstable_cache` or `fetch` tag revalidation.
-
----
-
-### 9. Describe your testing approach for a feature like the one in Part 2: what you unit test, what you test with a component test, what you leave to an end-to-end test, and why.
-
-**Unit Tests**:
-- **Scope**: Pure logic, utilities, API client parameter serialization, query key factory (`companiesKeys`), and date formatting functions.
-- **Why**: Executes in milliseconds with zero DOM overhead; catches schema regressions, URL string formatting bugs, and edge cases (e.g., date formatting in `nl-NL` vs `en-US`).
-
-**Component Tests (Vitest + React Testing Library)**:
-- **Scope**: Integration between UI components, URL state (`nuqs`), and React Query. Specifically: table rendering, typing into search, filtering by status dropdown, and the multi-step 409 Conflict flow (drawer opens, modifies draft, encounters 409 conflict, preserves typed draft, reloads version, and saves).
-- **Why**: Fast, deterministic in-memory execution using jsdom without spawning full browsers, verifying user workflows and accessible DOM semantics (`role="alert"`, `aria-invalid`).
-
-**End-to-End Tests (Playwright / Cypress)**:
-- **Scope**: True multi-tab concurrent editing (Tab A modifies a record, Tab B submits and triggers actual backend 409), full browser authentication redirects via identity provider cookies, and cross-browser visual rendering.
-- **Why**: Slower and more resource-intensive, but proves end-to-end network protocol integrity and real browser cookie/session handling.
+I'd unit test query keys, request headers, and error handling because those are easy to check without a browser. Component tests should cover the important workflows: filtering the list and editing through a 409, including checking that the typed draft survives the reload. This project also tests the actual route handlers, competing writes, field validation, and keyboard interaction with the drawer. I'd add browser tests for Back/Forward navigation, refresh, sign-in redirects, and two tabs editing the same record, since jsdom can't fully prove those behaviors.

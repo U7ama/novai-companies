@@ -11,8 +11,8 @@ body {
 
 /* Apply theme fonts to body for all themes */
 [data-theme] body {
-  --font-sans: initial;
-  --font-mono: initial;
-  --font-serif: initial;
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, monospace;
+  --font-serif: Georgia, serif;
   font-family: var(--font-sans);
 }

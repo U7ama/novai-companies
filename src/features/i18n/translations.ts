@@ -2,6 +2,7 @@ export type Locale = 'en' | 'nl';
 
 export type TranslationDictionary = {
   brand: string;
+  dismissNotification: string;
   companies: string;
   companiesSubtitle: string;
   searchPlaceholder: string;
@@ -25,6 +26,8 @@ export type TranslationDictionary = {
     errorDescription: string;
     retry: string;
     clearFilters: string;
+    loading: string;
+    updating: string;
   };
   pagination: {
     showing: string;
@@ -61,6 +64,15 @@ export type TranslationDictionary = {
     simulateConflictSuccess: string;
     nameRequired: string;
     domainInvalid: string;
+    createdSuccess: string;
+    savedSuccess: string;
+    saveFailed: string;
+    versionReloaded: string;
+    reloadFailed: string;
+    serverAdopted: string;
+    bumpFailed: string;
+    bumping: string;
+    loading: string;
   };
   auth: {
     title: string;
@@ -71,12 +83,14 @@ export type TranslationDictionary = {
     quickFill: string;
     signOut: string;
     tokenRequired: string;
+    management: string;
   };
 };
 
 export const translations: Record<Locale, TranslationDictionary> = {
   en: {
     brand: 'Novai',
+    dismissNotification: 'Dismiss notification',
     companies: 'Companies',
     companiesSubtitle: 'Manage and track sales accounts and pipeline companies.',
     searchPlaceholder: 'Search by company name or domain...',
@@ -99,7 +113,9 @@ export const translations: Record<Locale, TranslationDictionary> = {
       errorTitle: 'Failed to load companies',
       errorDescription: 'There was an error communicating with the API.',
       retry: 'Retry',
-      clearFilters: 'Clear all filters'
+      clearFilters: 'Clear all filters',
+      loading: 'Loading companies',
+      updating: 'Updating company data'
     },
     pagination: {
       showing: 'Showing',
@@ -136,21 +152,32 @@ export const translations: Record<Locale, TranslationDictionary> = {
       simulateConflict: 'Simulate Concurrent Edit',
       simulateConflictSuccess: 'Server version bumped! Next save will trigger a 409 conflict.',
       nameRequired: 'Company name is required and cannot be empty.',
-      domainInvalid: 'Domain must be a valid domain name (e.g. domain.com).'
+      domainInvalid: 'Domain must be a valid domain name (e.g. domain.com).',
+      createdSuccess: 'Company created.',
+      savedSuccess: 'Changes saved.',
+      saveFailed: 'Could not save changes. Please try again.',
+      versionReloaded: 'Latest version loaded. Your draft is preserved.',
+      reloadFailed: 'Could not load the latest version. Your draft is preserved.',
+      serverAdopted: 'Server values loaded.',
+      bumpFailed: 'Could not simulate a concurrent edit.',
+      bumping: 'Updating...',
+      loading: 'Loading company details'
     },
     auth: {
       title: 'Sign in to Novai CRM',
-      subtitle: 'Enter a Bearer token to access the multi-tenant organization companies API.',
+      subtitle: 'Enter any non-empty token to try the Companies demo.',
       tokenLabel: 'Access Token',
       tokenPlaceholder: 'e.g. dev-token-123',
       signInButton: 'Sign In',
       quickFill: 'Quick Fill Dev Token',
       signOut: 'Sign Out',
-      tokenRequired: 'Please enter a valid token.'
+      tokenRequired: 'Please enter a valid token.',
+      management: 'B2B Companies Management'
     }
   },
   nl: {
     brand: 'Novai',
+    dismissNotification: 'Melding sluiten',
     companies: 'Bedrijven',
     companiesSubtitle: 'Beheer en volg verkoopaccounts en pipelinebedrijven.',
     searchPlaceholder: 'Zoek op bedrijfsnaam of domein...',
@@ -173,7 +200,9 @@ export const translations: Record<Locale, TranslationDictionary> = {
       errorTitle: 'Fout bij het laden van bedrijven',
       errorDescription: 'Er is een fout opgetreden bij de communicatie met de API.',
       retry: 'Opnieuw proberen',
-      clearFilters: 'Alle filters wissen'
+      clearFilters: 'Alle filters wissen',
+      loading: 'Bedrijven laden',
+      updating: 'Bedrijfsgegevens bijwerken'
     },
     pagination: {
       showing: 'Weergave',
@@ -208,19 +237,30 @@ export const translations: Record<Locale, TranslationDictionary> = {
       reloadLatest: 'Herlaad nieuwste versie',
       adoptServer: 'Neem serverwaarden over',
       simulateConflict: 'Simuleer gelijktijdige bewerking',
-      simulateConflictSuccess: 'Serverversie verhoogd! Volgende opslag zal een 409-conflict veroorzaken.',
+      simulateConflictSuccess:
+        'Serverversie verhoogd! Volgende opslag zal een 409-conflict veroorzaken.',
       nameRequired: 'Bedrijfsnaam is verplicht en mag niet leeg zijn.',
-      domainInvalid: 'Domein moet een geldige domeinnaam zijn (bijv. domein.nl).'
+      domainInvalid: 'Domein moet een geldige domeinnaam zijn (bijv. domein.nl).',
+      createdSuccess: 'Bedrijf aangemaakt.',
+      savedSuccess: 'Wijzigingen opgeslagen.',
+      saveFailed: 'Opslaan mislukt. Probeer het opnieuw.',
+      versionReloaded: 'Nieuwste versie geladen. Uw invoer is behouden.',
+      reloadFailed: 'Laden van de nieuwste versie mislukt. Uw invoer is behouden.',
+      serverAdopted: 'Serverwaarden geladen.',
+      bumpFailed: 'Gelijktijdige bewerking simuleren mislukt.',
+      bumping: 'Bijwerken...',
+      loading: 'Bedrijfsgegevens laden'
     },
     auth: {
       title: 'Inloggen bij Novai CRM',
-      subtitle: 'Voer een Bearer-token in om toegang te krijgen tot de API.',
+      subtitle: 'Voer een token in om de bedrijvendemo te proberen.',
       tokenLabel: 'Toegangstoken',
       tokenPlaceholder: 'bijv. dev-token-123',
       signInButton: 'Inloggen',
       quickFill: 'Vul demo-token in',
       signOut: 'Uitloggen',
-      tokenRequired: 'Voer een geldig token in.'
+      tokenRequired: 'Voer een geldig token in.',
+      management: 'Beheer van B2B-bedrijven'
     }
   }
 } as const;

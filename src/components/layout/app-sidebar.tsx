@@ -26,6 +26,7 @@ import type { NavItem } from '@/types';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Icons } from '@/components/icons';
+import { useLanguage } from '@/features/i18n/i18n-context';
 import { clearAuthToken } from '@/features/auth/auth-store';
 
 function handleSignOut() {
@@ -36,6 +37,7 @@ function handleSignOut() {
 }
 
 export default function AppSidebar() {
+  const { t } = useLanguage();
   const pathname = usePathname();
   const filteredGroups = useFilteredNavGroups(navGroups);
 
@@ -46,7 +48,7 @@ export default function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               size='lg'
-              render={<Link href='/companies' aria-label='Novai CRM Companies' />}
+              render={<Link href='/companies' aria-label={`Novai CRM ${t.companies}`} />}
               className='hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
             >
               <div className='flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground'>
@@ -54,7 +56,7 @@ export default function AppSidebar() {
               </div>
               <div className='grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden'>
                 <span className='truncate font-semibold'>Novai</span>
-                <span className='truncate text-xs text-muted-foreground'>CRM Companies</span>
+                <span className='truncate text-xs text-muted-foreground'>CRM {t.companies}</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -66,7 +68,11 @@ export default function AppSidebar() {
             {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
             <SidebarMenu>
               {group.items.map((item) => (
-                <NavMainItem key={item.title} item={item} pathname={pathname} />
+                <NavMainItem
+                  key={item.title}
+                  item={{ ...item, title: t.companies }}
+                  pathname={pathname}
+                />
               ))}
             </SidebarMenu>
           </SidebarGroup>
@@ -111,7 +117,7 @@ export default function AppSidebar() {
                 <DropdownMenuGroup>
                   <DropdownMenuItem onClick={handleSignOut}>
                     <Icons.logout className='mr-2 h-4 w-4' />
-                    Sign out
+                    {t.auth.signOut}
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
               </DropdownMenuContent>
@@ -126,7 +132,8 @@ export default function AppSidebar() {
 
 function NavMainItem({ item, pathname }: { item: NavItem; pathname: string }) {
   const Icon = item.icon ? Icons[item.icon] : Icons.logo;
-  const isActive = pathname === item.url || (item.url !== '/' && pathname.startsWith(`${item.url}/`));
+  const isActive =
+    pathname === item.url || (item.url !== '/' && pathname.startsWith(`${item.url}/`));
 
   if (item.disabled) {
     return (

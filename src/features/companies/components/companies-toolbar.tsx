@@ -17,13 +17,7 @@ interface CompaniesToolbarProps {
   isFetching?: boolean;
 }
 
-const STATUS_KEYS: CompanyStatus[] = [
-  'new',
-  'researching',
-  'contacted',
-  'qualified',
-  'rejected'
-];
+const STATUS_KEYS: CompanyStatus[] = ['new', 'researching', 'contacted', 'qualified', 'rejected'];
 
 export function CompaniesToolbar({
   search,

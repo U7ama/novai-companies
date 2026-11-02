@@ -1,6 +1,5 @@
 import Providers from '@/components/layout/providers';
 import { Toaster } from '@/components/ui/sonner';
-import { fontVariables } from '@/components/themes/font.config';
 import { DEFAULT_THEME, THEMES } from '@/components/themes/theme.config';
 import ThemeProvider from '@/components/themes/theme-provider';
 import { cn } from '@/lib/utils';
@@ -64,12 +63,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           }}
         />
       </head>
-      <body
-        className={cn(
-          'bg-background overflow-x-hidden overscroll-none font-sans antialiased',
-          fontVariables
-        )}
-      >
+      <body className={cn('bg-background overflow-x-hidden overscroll-none font-sans antialiased')}>
         <NextTopLoader color='var(--primary)' showSpinner={false} />
         <NuqsAdapter>
           <ThemeProvider

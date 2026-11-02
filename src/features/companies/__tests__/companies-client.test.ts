@@ -1,7 +1,18 @@
+import { webcrypto, createHash } from 'node:crypto';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { companiesKeys, listCompaniesOptions, companyDetailOptions } from '../api/queries';
 import { companiesApi, ApiError } from '../api/client';
-import { setAuthToken, clearAuthToken, getAuthToken } from '@/features/auth/auth-store';
+import {
+  setAuthToken,
+  clearAuthToken,
+  getAuthToken,
+  onUnauthorized
+} from '@/features/auth/auth-store';
+
+vi.mock('@/features/auth/auth-store', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/auth/auth-store')>();
+  return { ...actual, onUnauthorized: vi.fn(() => actual.clearAuthToken()) };
+});
 
 describe('companiesKeys and query options', () => {
   it('generates normalized query keys', () => {
@@ -35,6 +46,8 @@ describe('companiesApi client', () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
   it('injects Authorization: Bearer <token> header when token is present', async () => {
@@ -68,6 +81,7 @@ describe('companiesApi client', () => {
 
     await expect(companiesApi.list()).rejects.toThrow(ApiError);
     expect(getAuthToken()).toBeNull();
+    expect(onUnauthorized).toHaveBeenCalledOnce();
   });
 
   it('handles 409 Conflict with parsed ApiError and message', async () => {
@@ -122,5 +136,32 @@ describe('companiesApi client', () => {
       expect(apiErr.status).toBe(422);
       expect(apiErr.errors?.name).toBe('Company name is required');
     }
+  });
+  it('hashes UTF-8 write payloads for the private AWS origin', async () => {
+    vi.stubEnv('NEXT_PUBLIC_AWS_OAC', 'true');
+    vi.stubGlobal('crypto', webcrypto);
+    const body = { name: 'Café Test' };
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ id: 'test' }), { status: 201 }));
+    globalThis.fetch = mockFetch;
+    await companiesApi.create(body);
+    const init = mockFetch.mock.calls[0][1];
+    expect(new Headers(init.headers).get('x-amz-content-sha256')).toBe(
+      createHash('sha256').update(JSON.stringify(body)).digest('hex')
+    );
+  });
+
+  it('hashes an empty body for the concurrent-edit helper on AWS', async () => {
+    vi.stubEnv('NEXT_PUBLIC_AWS_OAC', 'true');
+    vi.stubGlobal('crypto', webcrypto);
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ version: 2 }), { status: 200 }));
+    globalThis.fetch = mockFetch;
+    await companiesApi.bumpVersion('test');
+    expect(new Headers(mockFetch.mock.calls[0][1].headers).get('x-amz-content-sha256')).toBe(
+      createHash('sha256').update('').digest('hex')
+    );
   });
 });

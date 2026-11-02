@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1161.0",
     "@base-ui/react": "^1.9.0",
     "@base-ui/utils": "0.5.0",
     "@shadcn/react": "^0.3.1",

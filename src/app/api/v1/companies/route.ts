@@ -1,18 +1,9 @@
+import { readCompaniesStore, mutateCompaniesStore } from '@/lib/server/companies-repository';
+import { createCompanySchema, validationErrors } from '@/features/companies/validation';
+import { checkAuth } from '@/lib/server/api-auth';
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  getCompaniesStore,
-  simulateNetworkDelay
-} from '@/lib/server/companies-store';
+import { simulateNetworkDelay } from '@/lib/server/companies-store';
 import type { Company, CompanyStatus } from '@/features/companies/types';
-
-function checkAuth(request: NextRequest): boolean {
-  const authHeader = request.headers.get('Authorization') ?? request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return false;
-  }
-  const token = authHeader.slice(7).trim();
-  return token.length > 0;
-}
 
 export async function GET(request: NextRequest) {
   if (!checkAuth(request)) {
@@ -28,7 +19,7 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get('status')?.trim() as CompanyStatus | undefined;
   const sort = searchParams.get('sort')?.trim() ?? '-created_at';
 
-  let items = [...getCompaniesStore()];
+  let items = [...(await readCompaniesStore())];
 
   // Search filter (name and domain)
   if (q) {
@@ -40,7 +31,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Status filter
-  if (status && status !== 'all' as string) {
+  if (status && status !== ('all' as string)) {
     items = items.filter((comp) => comp.status === status);
   }
 
@@ -77,35 +68,24 @@ export async function POST(request: NextRequest) {
 
   await simulateNetworkDelay();
 
-  let body: {
-    name?: string;
-    domain?: string | null;
-    status?: CompanyStatus;
-  };
+  let payload: unknown;
 
   try {
-    body = await request.json();
+    payload = await request.json();
   } catch {
-    return NextResponse.json(
-      { message: 'Invalid JSON body' },
-      { status: 400 }
-    );
+    return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const name = body.name?.trim();
-  if (!name) {
+  const parsed = createCompanySchema.safeParse(payload);
+  if (!parsed.success) {
     return NextResponse.json(
-      {
-        message: 'Unprocessable Entity',
-        errors: { name: 'Company name is required' }
-      },
+      { message: 'Unprocessable Entity', errors: validationErrors(parsed.error) },
       { status: 422 }
     );
   }
-
+  const { name, domain: rawDomain, status = 'new' } = parsed.data;
+  const domain = rawDomain || null;
   const now = new Date().toISOString();
-  const domain = body.domain ? body.domain.trim() : null;
-  const status: CompanyStatus = body.status ?? 'new';
 
   const newCompany: Company = {
     id: `comp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -117,8 +97,8 @@ export async function POST(request: NextRequest) {
     updated_at: now
   };
 
-  const store = getCompaniesStore();
-  store.unshift(newCompany);
-
-  return NextResponse.json(newCompany, { status: 201 });
+  return mutateCompaniesStore<Response>((store) => {
+    store.unshift(newCompany);
+    return { value: NextResponse.json(newCompany, { status: 201 }), changed: true };
+  });
 }

@@ -1,23 +1,10 @@
+import { readCompaniesStore, mutateCompaniesStore } from '@/lib/server/companies-repository';
+import { updateCompanySchema, validationErrors } from '@/features/companies/validation';
+import { checkAuth } from '@/lib/server/api-auth';
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  getCompaniesStore,
-  simulateNetworkDelay
-} from '@/lib/server/companies-store';
-import type { CompanyStatus } from '@/features/companies/types';
+import { simulateNetworkDelay } from '@/lib/server/companies-store';
 
-function checkAuth(request: NextRequest): boolean {
-  const authHeader = request.headers.get('Authorization') ?? request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return false;
-  }
-  const token = authHeader.slice(7).trim();
-  return token.length > 0;
-}
-
-export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   if (!checkAuth(request)) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
@@ -25,7 +12,7 @@ export async function GET(
   await simulateNetworkDelay();
 
   const { id } = await context.params;
-  const store = getCompaniesStore();
+  const store = await readCompaniesStore();
   const company = store.find((c) => c.id === id);
 
   if (!company) {
@@ -35,10 +22,7 @@ export async function GET(
   return NextResponse.json(company, { status: 200 });
 }
 
-export async function PATCH(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   if (!checkAuth(request)) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
@@ -46,66 +30,48 @@ export async function PATCH(
   await simulateNetworkDelay();
 
   const { id } = await context.params;
-  const store = getCompaniesStore();
-  const companyIndex = store.findIndex((c) => c.id === id);
-
-  if (companyIndex === -1) {
-    return NextResponse.json({ message: 'Company not found' }, { status: 404 });
-  }
-
-  const existingCompany = store[companyIndex];
-
-  let body: {
-    if_version?: number;
-    name?: string;
-    domain?: string | null;
-    status?: CompanyStatus;
-  };
+  let payload: unknown;
 
   try {
-    body = await request.json();
+    payload = await request.json();
   } catch {
-    return NextResponse.json(
-      { message: 'Invalid JSON body' },
-      { status: 400 }
-    );
+    return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 });
   }
 
-  // Validate name if provided
-  if (body.name !== undefined && body.name.trim() === '') {
+  const parsed = updateCompanySchema.safeParse(payload);
+  if (!parsed.success) {
     return NextResponse.json(
-      {
-        message: 'Unprocessable Entity',
-        errors: { name: 'Company name cannot be empty' }
-      },
+      { message: 'Unprocessable Entity', errors: validationErrors(parsed.error) },
       { status: 422 }
     );
   }
+  const body = parsed.data;
 
-  // Check optimistic concurrency version
-  if (body.if_version !== undefined && body.if_version !== existingCompany.version) {
-    return NextResponse.json(
-      {
-        message: 'Conflict: This record was modified by another user.',
-        current_version: existingCompany.version
-      },
-      { status: 409 }
-    );
-  }
-
-  // Apply updates
-  if (body.name !== undefined) {
-    existingCompany.name = body.name.trim();
-  }
-  if (body.domain !== undefined) {
-    existingCompany.domain = body.domain ? body.domain.trim() : null;
-  }
-  if (body.status !== undefined) {
-    existingCompany.status = body.status;
-  }
-
-  existingCompany.version += 1;
-  existingCompany.updated_at = new Date().toISOString();
-
-  return NextResponse.json(existingCompany, { status: 200 });
+  return mutateCompaniesStore<Response>((store) => {
+    const existingCompany = store.find((company) => company.id === id);
+    if (!existingCompany) {
+      return {
+        value: NextResponse.json({ message: 'Company not found' }, { status: 404 }),
+        changed: false
+      };
+    }
+    if (body.if_version !== existingCompany.version) {
+      return {
+        value: NextResponse.json(
+          {
+            message: 'Conflict: This record was modified by another user.',
+            current_version: existingCompany.version
+          },
+          { status: 409 }
+        ),
+        changed: false
+      };
+    }
+    if (body.name !== undefined) existingCompany.name = body.name;
+    if (body.domain !== undefined) existingCompany.domain = body.domain || null;
+    if (body.status !== undefined) existingCompany.status = body.status;
+    existingCompany.version += 1;
+    existingCompany.updated_at = new Date().toISOString();
+    return { value: NextResponse.json(existingCompany), changed: true };
+  });
 }

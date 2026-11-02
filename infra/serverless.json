@@ -1,0 +1,436 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Novai Companies serverless demo. No EC2, VPC, NAT gateway, API Gateway, provisioned concurrency or retained deployment archives.",
+  "Metadata": {
+    "Design": {
+      "Compute": "Lambda on demand, 512 MB; no warmers or provisioned concurrency",
+      "Data": "Optional shared demo snapshot; local assessment remains in memory",
+      "DynamoDB": "5 RCU and 5 WCU; AWS-owned encryption at rest; retained on stack deletion",
+      "Access": "Only this CloudFront distribution may invoke the IAM-protected Lambda URL",
+      "IAM": "SDK actions checked with IAM Policy Autopilot; limited to this table and log group",
+      "Costs": "Expected demo usage fits current account free allowances. These are shared account limits, not a hard billing cap."
+    }
+  },
+  "Parameters": {
+    "AppName": {
+      "Type": "String",
+      "Default": "novai-companies",
+      "AllowedPattern": "[a-z][a-z0-9-]{2,39}"
+    },
+    "DomainName": {
+      "Type": "String",
+      "Default": "novai-companies.usamaaslam.site",
+      "AllowedPattern": "[a-z0-9.-]+"
+    },
+    "CertificateArn": {
+      "Type": "String",
+      "AllowedPattern": "arn:aws:acm:us-east-1:[0-9]{12}:certificate/[a-f0-9-]+"
+    },
+    "ArtifactBucket": {
+      "Type": "String",
+      "AllowedPattern": "[a-z0-9.-]{3,63}"
+    },
+    "ArtifactKey": {
+      "Type": "String",
+      "AllowedPattern": "novai-companies/[A-Za-z0-9./_-]+[.]zip"
+    }
+  },
+  "Resources": {
+    "State": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": {
+          "Fn::Sub": "${AppName}-state"
+        },
+        "BillingMode": "PROVISIONED",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "pk",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "pk",
+            "KeyType": "HASH"
+          }
+        ],
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": 5,
+          "WriteCapacityUnits": 5
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "AppName"
+            }
+          }
+        ]
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "Logs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/lambda/${AppName}-web"
+        },
+        "RetentionInDays": 7
+      }
+    },
+    "Role": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "ApplicationAccess",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "State",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Logs",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "Web": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": {
+          "Fn::Sub": "${AppName}-web"
+        },
+        "Runtime": "nodejs22.x",
+        "Handler": "run.sh",
+        "Architectures": [
+          "x86_64"
+        ],
+        "Role": {
+          "Fn::GetAtt": [
+            "Role",
+            "Arn"
+          ]
+        },
+        "MemorySize": 512,
+        "Timeout": 30,
+        "Code": {
+          "S3Bucket": {
+            "Ref": "ArtifactBucket"
+          },
+          "S3Key": {
+            "Ref": "ArtifactKey"
+          }
+        },
+        "Layers": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:30"
+          }
+        ],
+        "Environment": {
+          "Variables": {
+            "AWS_LAMBDA_EXEC_WRAPPER": "/opt/bootstrap",
+            "AWS_LWA_ENABLE_COMPRESSION": "true",
+            "AWS_LWA_AUTHORIZATION_SOURCE": "x-novai-authorization",
+            "AWS_LWA_READINESS_CHECK_PATH": "/sign-in",
+            "PORT": "8080",
+            "HOSTNAME": "0.0.0.0",
+            "NODE_ENV": "production",
+            "NEXT_TELEMETRY_DISABLED": "1",
+            "COMPANIES_TABLE": {
+              "Ref": "State"
+            }
+          }
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "AppName"
+            }
+          }
+        ]
+      },
+      "DependsOn": [
+        "Logs"
+      ]
+    },
+    "Url": {
+      "Type": "AWS::Lambda::Url",
+      "Properties": {
+        "AuthType": "AWS_IAM",
+        "TargetFunctionArn": {
+          "Fn::GetAtt": [
+            "Web",
+            "Arn"
+          ]
+        },
+        "InvokeMode": "BUFFERED"
+      }
+    },
+    "OriginAccess": {
+      "Type": "AWS::CloudFront::OriginAccessControl",
+      "Properties": {
+        "OriginAccessControlConfig": {
+          "Name": {
+            "Fn::Sub": "${AppName}-lambda-origin"
+          },
+          "OriginAccessControlOriginType": "lambda",
+          "SigningBehavior": "always",
+          "SigningProtocol": "sigv4"
+        }
+      }
+    },
+    "ForwardAuth": {
+      "Type": "AWS::CloudFront::Function",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${AppName}-forward-auth"
+        },
+        "AutoPublish": true,
+        "FunctionConfig": {
+          "Comment": "Preserve demo bearer auth before CloudFront signs the origin request",
+          "Runtime": "cloudfront-js-2.0"
+        },
+        "FunctionCode": "function handler(event) {\n  var request = event.request;\n  var auth = request.headers.authorization;\n  delete request.headers['x-novai-authorization'];\n  if (auth) {\n    request.headers['x-novai-authorization'] = auth;\n    delete request.headers.authorization;\n  }\n  return request;\n}"
+      }
+    },
+    "CDN": {
+      "Type": "AWS::CloudFront::Distribution",
+      "Properties": {
+        "DistributionConfig": {
+          "Enabled": true,
+          "Comment": {
+            "Fn::Sub": "${AppName} request-based demo hosting"
+          },
+          "Aliases": [
+            {
+              "Ref": "DomainName"
+            }
+          ],
+          "HttpVersion": "http2and3",
+          "IPV6Enabled": true,
+          "PriceClass": "PriceClass_100",
+          "Origins": [
+            {
+              "Id": "lambda",
+              "DomainName": {
+                "Fn::Select": [
+                  2,
+                  {
+                    "Fn::Split": [
+                      "/",
+                      {
+                        "Fn::GetAtt": [
+                          "Url",
+                          "FunctionUrl"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "OriginAccessControlId": {
+                "Ref": "OriginAccess"
+              },
+              "CustomOriginConfig": {
+                "OriginProtocolPolicy": "https-only",
+                "OriginSSLProtocols": [
+                  "TLSv1.2"
+                ],
+                "OriginReadTimeout": 30
+              }
+            }
+          ],
+          "DefaultCacheBehavior": {
+            "TargetOriginId": "lambda",
+            "ViewerProtocolPolicy": "redirect-to-https",
+            "AllowedMethods": [
+              "GET",
+              "HEAD",
+              "OPTIONS",
+              "PUT",
+              "PATCH",
+              "POST",
+              "DELETE"
+            ],
+            "CachedMethods": [
+              "GET",
+              "HEAD"
+            ],
+            "Compress": true,
+            "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
+            "OriginRequestPolicyId": "b689b0a8-53d0-40ab-baf2-68738e2966ac",
+            "FunctionAssociations": [
+              {
+                "EventType": "viewer-request",
+                "FunctionARN": {
+                  "Fn::GetAtt": [
+                    "ForwardAuth",
+                    "FunctionARN"
+                  ]
+                }
+              }
+            ]
+          },
+          "CacheBehaviors": [
+            {
+              "TargetOriginId": "lambda",
+              "ViewerProtocolPolicy": "redirect-to-https",
+              "AllowedMethods": [
+                "GET",
+                "HEAD",
+                "OPTIONS"
+              ],
+              "CachedMethods": [
+                "GET",
+                "HEAD"
+              ],
+              "Compress": true,
+              "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
+              "OriginRequestPolicyId": "b689b0a8-53d0-40ab-baf2-68738e2966ac",
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "ForwardAuth",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
+              "PathPattern": "/_next/static/*"
+            }
+          ],
+          "ViewerCertificate": {
+            "AcmCertificateArn": {
+              "Ref": "CertificateArn"
+            },
+            "SslSupportMethod": "sni-only",
+            "MinimumProtocolVersion": "TLSv1.2_2021"
+          },
+          "Restrictions": {
+            "GeoRestriction": {
+              "RestrictionType": "none"
+            }
+          }
+        }
+      }
+    },
+    "UrlAccess": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunctionUrl",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "Web",
+            "Arn"
+          ]
+        },
+        "Principal": "cloudfront.amazonaws.com",
+        "SourceArn": {
+          "Fn::Sub": "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${CDN}"
+        },
+        "SourceAccount": {
+          "Ref": "AWS::AccountId"
+        }
+      }
+    },
+    "InvokeAccess": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "Web",
+            "Arn"
+          ]
+        },
+        "Principal": "cloudfront.amazonaws.com",
+        "SourceArn": {
+          "Fn::Sub": "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${CDN}"
+        },
+        "SourceAccount": {
+          "Ref": "AWS::AccountId"
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "Website": {
+      "Value": {
+        "Fn::Sub": "https://${DomainName}"
+      }
+    },
+    "CloudFrontDomain": {
+      "Value": {
+        "Fn::GetAtt": [
+          "CDN",
+          "DomainName"
+        ]
+      }
+    },
+    "DistributionId": {
+      "Value": {
+        "Ref": "CDN"
+      }
+    },
+    "FunctionName": {
+      "Value": {
+        "Ref": "Web"
+      }
+    },
+    "OriginUrl": {
+      "Value": {
+        "Fn::GetAtt": [
+          "Url",
+          "FunctionUrl"
+        ]
+      }
+    },
+    "StateTable": {
+      "Value": {
+        "Ref": "State"
+      }
+    }
+  }
+}

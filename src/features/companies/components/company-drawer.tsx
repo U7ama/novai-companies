@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import {
   Sheet,
   SheetContent,
@@ -21,6 +21,7 @@ import { useLanguage } from '@/features/i18n/i18n-context';
 import { formatDate } from '@/features/i18n/translations';
 import { companyDetailOptions, companiesKeys } from '../api/queries';
 import { companiesApi, ApiError } from '../api/client';
+import { createCompanySchema, validationErrors } from '../validation';
 import type { Company, CompanyStatus } from '../types';
 
 interface CompanyDrawerProps {
@@ -46,7 +47,6 @@ interface CompanyFormProps {
 function CompanyForm({ company, isCreate, onClose }: CompanyFormProps) {
   const { locale, t } = useLanguage();
   const queryClient = useQueryClient();
-  const [isPending, startTransition] = useTransition();
 
   // Form draft state initialized from prop (remounts on key change)
   const [name, setName] = useState(company?.name ?? '');
@@ -57,73 +57,56 @@ function CompanyForm({ company, isCreate, onClose }: CompanyFormProps) {
   // Error & conflict state
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isConflict, setIsConflict] = useState(false);
-  const [simulatingConflict, setSimulatingConflict] = useState(false);
+  const [isReloading, setIsReloading] = useState(false);
 
-  const validate = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    if (!name.trim()) {
-      newErrors.name = t.drawer.nameRequired;
-    }
-    if (domain.trim()) {
-      const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9](?:\.[a-zA-Z]{2,})+$/;
-      if (!domainRegex.test(domain.trim()) && !domain.trim().includes('.')) {
-        newErrors.domain = t.drawer.domainInvalid;
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const body = { name: name.trim(), domain: domain.trim() || null, status };
+      if (isCreate) return companiesApi.create(body);
+      if (!company) throw new Error('Missing company');
+      return companiesApi.update(company.id, { ...body, if_version: formVersion });
+    },
+    onSuccess: async (updated) => {
+      queryClient.setQueryData(companiesKeys.detail(updated.id), updated);
+      await queryClient.invalidateQueries({ queryKey: companiesKeys.lists() });
+      toast.success(isCreate ? t.drawer.createdSuccess : t.drawer.savedSuccess);
+      onClose();
+    },
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 409) {
+        setIsConflict(true);
+      } else if (err instanceof ApiError && err.status === 422) {
+        setErrors(err.errors ?? { name: err.message });
+      } else {
+        toast.error(t.drawer.saveFailed);
       }
     }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  });
+  const bumpMutation = useMutation({
+    mutationFn: () => companiesApi.bumpVersion(company!.id),
+    onSuccess: () => toast.warning(t.drawer.simulateConflictSuccess),
+    onError: () => toast.error(t.drawer.bumpFailed)
+  });
+  const isPending = saveMutation.isPending;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) return;
-
-    startTransition(async () => {
-      try {
-        if (isCreate) {
-          await companiesApi.create({
-            name: name.trim(),
-            domain: domain.trim() || null,
-            status
-          });
-          toast.success(t.drawer.createTitle);
-          await queryClient.invalidateQueries({ queryKey: companiesKeys.lists() });
-          onClose();
-        } else if (company) {
-          const updated = await companiesApi.update(company.id, {
-            if_version: formVersion,
-            name: name.trim(),
-            domain: domain.trim() || null,
-            status
-          });
-          toast.success(t.drawer.save);
-          setIsConflict(false);
-          setFormVersion(updated.version);
-          await Promise.all([
-            queryClient.invalidateQueries({ queryKey: companiesKeys.lists() }),
-            queryClient.invalidateQueries({ queryKey: companiesKeys.detail(company.id) })
-          ]);
-          onClose();
-        }
-      } catch (err) {
-        if (err instanceof ApiError) {
-          if (err.status === 409) {
-            // Optimistic concurrency conflict: keep user's typed values!
-            setIsConflict(true);
-          } else if (err.status === 422) {
-            setErrors(err.errors ?? { name: err.message });
-          } else {
-            toast.error(err.message);
-          }
-        } else {
-          toast.error('An unexpected error occurred');
-        }
-      }
-    });
+    if (isPending || isReloading) return;
+    const parsed = createCompanySchema.safeParse({ name, domain, status });
+    if (!parsed.success) {
+      const nextErrors = validationErrors(parsed.error);
+      if (nextErrors.name) nextErrors.name = t.drawer.nameRequired;
+      if (nextErrors.domain) nextErrors.domain = t.drawer.domainInvalid;
+      setErrors(nextErrors);
+      return;
+    }
+    setErrors({});
+    saveMutation.mutate();
   };
 
   const handleReloadLatest = async () => {
     if (!company) return;
+    setIsReloading(true);
     try {
       const fresh = await queryClient.fetchQuery({
         ...companyDetailOptions(company.id),
@@ -132,14 +115,17 @@ function CompanyForm({ company, isCreate, onClose }: CompanyFormProps) {
       // Synchronize version without overwriting user's typed changes
       setFormVersion(fresh.version);
       setIsConflict(false);
-      toast.info(`Updated concurrency version to ${fresh.version}. You can now save.`);
+      toast.info(t.drawer.versionReloaded);
     } catch {
-      toast.error('Failed to load latest version from server.');
+      toast.error(t.drawer.reloadFailed);
+    } finally {
+      setIsReloading(false);
     }
   };
 
   const handleAdoptServerValues = async () => {
     if (!company) return;
+    setIsReloading(true);
     try {
       const fresh = await queryClient.fetchQuery({
         ...companyDetailOptions(company.id),
@@ -150,22 +136,12 @@ function CompanyForm({ company, isCreate, onClose }: CompanyFormProps) {
       setStatus(fresh.status);
       setFormVersion(fresh.version);
       setIsConflict(false);
-      toast.info('Loaded server values into form.');
+      setErrors({});
+      toast.info(t.drawer.serverAdopted);
     } catch {
-      toast.error('Failed to load server values.');
-    }
-  };
-
-  const handleSimulateConflict = async () => {
-    if (!company) return;
-    setSimulatingConflict(true);
-    try {
-      await companiesApi.bumpVersion(company.id);
-      toast.warning(t.drawer.simulateConflictSuccess);
-    } catch {
-      toast.error('Failed to bump server version.');
+      toast.error(t.drawer.reloadFailed);
     } finally {
-      setSimulatingConflict(false);
+      setIsReloading(false);
     }
   };
 
@@ -195,6 +171,7 @@ function CompanyForm({ company, isCreate, onClose }: CompanyFormProps) {
                 size='sm'
                 variant='default'
                 onClick={handleReloadLatest}
+                disabled={isReloading || isPending}
                 className='h-8 text-xs font-medium'
               >
                 <Icons.checks className='mr-1.5 h-3.5 w-3.5' />
@@ -205,6 +182,7 @@ function CompanyForm({ company, isCreate, onClose }: CompanyFormProps) {
                 size='sm'
                 variant='outline'
                 onClick={handleAdoptServerValues}
+                disabled={isReloading || isPending}
                 className='h-8 text-xs font-medium'
               >
                 {t.drawer.adoptServer}
@@ -308,12 +286,12 @@ function CompanyForm({ company, isCreate, onClose }: CompanyFormProps) {
                 type='button'
                 variant='outline'
                 size='sm'
-                onClick={handleSimulateConflict}
-                disabled={simulatingConflict || isPending}
+                onClick={() => bumpMutation.mutate()}
+                disabled={bumpMutation.isPending || isPending || isReloading}
                 className='w-full h-8 text-xs text-muted-foreground hover:text-foreground'
               >
                 <Icons.edit className='mr-1.5 h-3.5 w-3.5' />
-                {simulatingConflict ? 'Bumping...' : t.drawer.simulateConflict}
+                {bumpMutation.isPending ? t.drawer.bumping : t.drawer.simulateConflict}
               </Button>
             </div>
           </div>
@@ -321,13 +299,18 @@ function CompanyForm({ company, isCreate, onClose }: CompanyFormProps) {
       </form>
 
       <SheetFooter className='p-4 sm:p-6 border-t bg-muted/10 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2'>
-        <Button type='button' variant='outline' onClick={onClose} disabled={isPending}>
+        <Button
+          type='button'
+          variant='outline'
+          onClick={onClose}
+          disabled={isPending || isReloading}
+        >
           {t.drawer.cancel}
         </Button>
         <Button
           type='submit'
           form='company-form'
-          disabled={isPending}
+          disabled={isPending || isReloading}
           className='font-medium'
         >
           {isPending && <Icons.spinner className='mr-2 h-4 w-4 animate-spin' />}
@@ -359,7 +342,12 @@ export function CompanyDrawer({ companyId, isCreate, onClose }: CompanyDrawerPro
   const is404 = isError && queryError instanceof ApiError && queryError.status === 404;
 
   return (
-    <Sheet open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Sheet
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <SheetContent
         side='right'
         className='data-[side=right]:w-full sm:data-[side=right]:max-w-lg p-0 flex flex-col justify-between overflow-y-auto'
@@ -374,8 +362,16 @@ export function CompanyDrawer({ companyId, isCreate, onClose }: CompanyDrawerPro
           </SheetDescription>
         </SheetHeader>
 
+        {isEdit && isError && company && (
+          <div role='alert' className='px-6 text-sm text-destructive'>
+            {t.drawer.reloadFailed}
+            <Button variant='link' onClick={() => refetch()}>
+              {t.table.retry}
+            </Button>
+          </div>
+        )}
         {isEdit && isLoading ? (
-          <div className='p-6 space-y-5 flex-1' role='status' aria-label='Loading company details'>
+          <div className='p-6 space-y-5 flex-1' role='status' aria-label={t.drawer.loading}>
             <div className='space-y-2'>
               <Skeleton className='h-4 w-24' />
               <Skeleton className='h-9 w-full' />
@@ -389,21 +385,29 @@ export function CompanyDrawer({ companyId, isCreate, onClose }: CompanyDrawerPro
               <Skeleton className='h-9 w-full' />
             </div>
           </div>
-        ) : isEdit && is404 ? (
-          <div className='p-6 text-center space-y-4 flex-1 flex flex-col items-center justify-center' role='alert'>
+        ) : isEdit && is404 && !company ? (
+          <div
+            className='p-6 text-center space-y-4 flex-1 flex flex-col items-center justify-center'
+            role='alert'
+          >
             <div className='flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive'>
               <Icons.alertCircle className='h-6 w-6' />
             </div>
             <h3 className='text-base font-semibold'>{t.drawer.notFoundTitle}</h3>
             <p className='text-sm text-muted-foreground max-w-xs'>{t.drawer.notFoundDescription}</p>
-            <Button variant='outline' onClick={onClose}>{t.drawer.cancel}</Button>
+            <Button variant='outline' onClick={onClose}>
+              {t.drawer.cancel}
+            </Button>
           </div>
-        ) : isEdit && isError ? (
-          <div className='p-6 text-center space-y-4 flex-1 flex flex-col items-center justify-center' role='alert'>
+        ) : isEdit && isError && !company ? (
+          <div
+            className='p-6 text-center space-y-4 flex-1 flex flex-col items-center justify-center'
+            role='alert'
+          >
             <Icons.alertCircle className='h-10 w-10 text-destructive' />
             <h3 className='text-base font-semibold'>{t.drawer.errorTitle}</h3>
             <p className='text-sm text-muted-foreground'>
-              {queryError instanceof Error ? queryError.message : 'Error fetching company'}
+              {queryError instanceof Error ? queryError.message : t.drawer.errorTitle}
             </p>
             <Button variant='outline' onClick={() => refetch()}>
               <Icons.toastWarning className='mr-2 h-4 w-4' />
@@ -412,8 +416,8 @@ export function CompanyDrawer({ companyId, isCreate, onClose }: CompanyDrawerPro
           </div>
         ) : (
           <CompanyForm
-            key={isCreate ? 'create' : company?.id ?? 'none'}
-            company={isCreate ? null : company ?? null}
+            key={isCreate ? 'create' : (company?.id ?? 'none')}
+            company={isCreate ? null : (company ?? null)}
             isCreate={isCreate}
             onClose={onClose}
           />

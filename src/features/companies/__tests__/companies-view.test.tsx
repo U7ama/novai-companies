@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
+import { NuqsTestingAdapter, type OnUrlUpdateFunction } from 'nuqs/adapters/testing';
 import { LanguageProvider } from '@/features/i18n/i18n-context';
 import { setAuthToken, clearAuthToken } from '@/features/auth/auth-store';
 import { CompaniesView } from '../components/companies-view';
@@ -44,7 +44,8 @@ function createTestQueryClient() {
     defaultOptions: {
       queries: {
         retry: false,
-        staleTime: 0
+        staleTime: 0,
+        retryDelay: 0
       },
       mutations: {
         retry: false
@@ -53,15 +54,17 @@ function createTestQueryClient() {
   });
 }
 
-function renderWithProviders(ui: React.ReactElement, initialSearch = '') {
+function renderWithProviders(
+  ui: React.ReactElement,
+  initialSearch = '',
+  onUrlUpdate?: OnUrlUpdateFunction
+) {
   const queryClient = createTestQueryClient();
   return {
     ...render(
       <QueryClientProvider client={queryClient}>
-        <NuqsTestingAdapter searchParams={initialSearch} hasMemory>
-          <LanguageProvider>
-            {ui}
-          </LanguageProvider>
+        <NuqsTestingAdapter searchParams={initialSearch} hasMemory onUrlUpdate={onUrlUpdate}>
+          <LanguageProvider>{ui}</LanguageProvider>
         </NuqsTestingAdapter>
       </QueryClientProvider>
     ),
@@ -75,6 +78,7 @@ describe('CompaniesView component tests', () => {
   beforeEach(() => {
     setAuthToken('test-bearer-token');
     vi.restoreAllMocks();
+    localStorage.removeItem('novai_locale');
   });
 
   afterEach(() => {
@@ -93,7 +97,8 @@ describe('CompaniesView component tests', () => {
       let filtered = [...MOCK_COMPANIES];
       if (q) {
         filtered = filtered.filter(
-          (c) => c.name.toLowerCase().includes(q) || (c.domain && c.domain.toLowerCase().includes(q))
+          (c) =>
+            c.name.toLowerCase().includes(q) || (c.domain && c.domain.toLowerCase().includes(q))
         );
       }
       if (status && status !== 'all') {
@@ -286,5 +291,194 @@ describe('CompaniesView component tests', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
+  });
+  it('pushes pagination and sort history and keeps the table mounted', async () => {
+    const user = userEvent.setup();
+    const onUrlUpdate = vi.fn();
+    globalThis.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            items: MOCK_COMPANIES,
+            total: 40,
+            limit: 20,
+            offset: 0
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    renderWithProviders(<CompaniesView />, '', onUrlUpdate);
+    await screen.findByText('ASML Holding N.V.');
+    const table = screen.getByRole('table');
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await waitFor(() =>
+      expect(onUrlUpdate).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          searchParams: expect.any(URLSearchParams),
+          options: expect.objectContaining({ history: 'push' })
+        })
+      )
+    );
+    expect(onUrlUpdate.mock.lastCall?.[0].searchParams.get('page')).toBe('2');
+    await user.click(screen.getByRole('columnheader', { name: /Company Name/ }));
+    await waitFor(() =>
+      expect(onUrlUpdate.mock.lastCall?.[0].searchParams.get('sort')).toBe('name')
+    );
+    expect(onUrlUpdate.mock.lastCall?.[0].searchParams.get('page')).toBeNull();
+    expect(screen.getByRole('table')).toBe(table);
+  });
+
+  it('supports keyboard opening, trapped focus, Escape and focus return', async () => {
+    const user = userEvent.setup();
+    globalThis.fetch = vi
+      .fn()
+      .mockImplementation((url: string) =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify(
+              url.includes('/comp_01')
+                ? MOCK_COMPANIES[0]
+                : { items: MOCK_COMPANIES, total: 3, limit: 20, offset: 0 }
+            ),
+            { status: 200 }
+          )
+        )
+      );
+    renderWithProviders(<CompaniesView />);
+    const cell = await screen.findByText('ASML Holding N.V.');
+    const row = cell.closest('tr')!;
+    row.focus();
+    await user.keyboard('{Enter}');
+    const dialog = await screen.findByRole('dialog');
+    await screen.findByDisplayValue('ASML Holding N.V.');
+    for (let i = 0; i < 10; i++) {
+      await user.tab();
+      await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+    }
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(document.activeElement).toBe(row));
+  });
+
+  it('normalizes an out-of-range page', async () => {
+    const onUrlUpdate = vi.fn();
+    globalThis.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            items: MOCK_COMPANIES,
+            total: 3,
+            limit: 20,
+            offset: 0
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    renderWithProviders(<CompaniesView />, '?page=99', onUrlUpdate);
+    await waitFor(() => expect(onUrlUpdate.mock.lastCall?.[0].searchParams.get('page')).toBeNull());
+    expect(screen.getByText('1 / 1')).toBeInTheDocument();
+  });
+
+  it('preserves an edited draft through a failed detail refetch and retry', async () => {
+    const user = userEvent.setup();
+    let failDetail = false;
+    globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/comp_01') && failDetail) return Promise.reject(new Error('Offline'));
+      return Promise.resolve(
+        new Response(
+          JSON.stringify(
+            url.includes('/comp_01')
+              ? MOCK_COMPANIES[0]
+              : {
+                  items: MOCK_COMPANIES,
+                  total: 3,
+                  limit: 20,
+                  offset: 0
+                }
+          ),
+          { status: 200 }
+        )
+      );
+    });
+    const { queryClient } = renderWithProviders(<CompaniesView />, '?companyId=comp_01');
+    const name = await screen.findByDisplayValue('ASML Holding N.V.');
+    await user.clear(name);
+    await user.type(name, 'Preserve this draft');
+    failDetail = true;
+    await queryClient.invalidateQueries({ queryKey: ['companies', 'detail', 'comp_01'] });
+    expect(await screen.findByText(/Could not load the latest version/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Preserve this draft')).toBe(name);
+    failDetail = false;
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() =>
+      expect(screen.queryByText(/Could not load the latest version/)).not.toBeInTheDocument()
+    );
+    expect(screen.getByDisplayValue('Preserve this draft')).toBe(name);
+  });
+
+  it('blocks invalid client input and announces API field errors', async () => {
+    const user = userEvent.setup();
+    globalThis.fetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST')
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              message: 'Validation failed',
+              errors: { name: 'Server rejected this company name' }
+            }),
+            { status: 422 }
+          )
+        );
+      return Promise.resolve(
+        new Response(JSON.stringify({ items: MOCK_COMPANIES, total: 3, limit: 20, offset: 0 }), {
+          status: 200
+        })
+      );
+    });
+    renderWithProviders(<CompaniesView />);
+    await user.click(screen.getByRole('button', { name: 'Create Company' }));
+    await user.click(screen.getByRole('button', { name: 'Create Company' }));
+    expect(await screen.findByText(/Company name is required/)).toHaveAttribute('role', 'alert');
+    await user.type(screen.getByLabelText(/Company Name/), 'New Company');
+    await user.type(screen.getByLabelText('Domain'), 'bad domain.');
+    await user.click(screen.getByRole('button', { name: 'Create Company' }));
+    expect(await screen.findByText(/Domain must be a valid/)).toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+    await user.clear(screen.getByLabelText('Domain'));
+    await user.click(screen.getByRole('button', { name: 'Create Company' }));
+    expect(await screen.findByText('Server rejected this company name')).toHaveAttribute(
+      'role',
+      'alert'
+    );
+    expect(screen.getByLabelText(/Company Name/)).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByDisplayValue('New Company')).toBeInTheDocument();
+  });
+
+  it('renders Dutch feature labels and locale-formatted dates', async () => {
+    localStorage.setItem('novai_locale', 'nl');
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          items: MOCK_COMPANIES,
+          total: 3,
+          limit: 20,
+          offset: 0
+        }),
+        { status: 200 }
+      )
+    );
+    renderWithProviders(<CompaniesView />);
+    await screen.findByText('ASML Holding N.V.');
+    expect(screen.getByRole('heading', { name: 'Bedrijven' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Aangemaakt' })).toBeInTheDocument();
+    const expectedDate = new Intl.DateTimeFormat('nl-NL', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }).format(new Date(MOCK_COMPANIES[0].created_at));
+    expect(screen.getByText(expectedDate)).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe('nl');
   });
 });

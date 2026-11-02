@@ -1,6 +1,12 @@
 'use client';
 
-import React, { createContext, useCallback, useContext, useSyncExternalStore } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useSyncExternalStore,
+  useEffect
+} from 'react';
 import { translations, type Locale, type TranslationDictionary } from './translations';
 
 const STORAGE_KEY = 'novai_locale';
@@ -23,8 +29,12 @@ function subscribe(callback: () => void) {
 }
 
 function getSnapshot(): Locale {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  return saved === 'nl' ? 'nl' : 'en';
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved === 'nl' ? 'nl' : 'en';
+  } catch {
+    return 'en';
+  }
 }
 
 function getServerSnapshot(): Locale {
@@ -36,18 +46,22 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   const setLocale = useCallback((newLocale: Locale) => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, newLocale);
+      try {
+        localStorage.setItem(STORAGE_KEY, newLocale);
+      } catch {
+        /* Storage blocked */
+      }
       window.dispatchEvent(new Event('novai-locale-change'));
     }
   }, []);
 
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
+
   const t = translations[locale];
 
-  return (
-    <I18nContext.Provider value={{ locale, setLocale, t }}>
-      {children}
-    </I18nContext.Provider>
-  );
+  return <I18nContext.Provider value={{ locale, setLocale, t }}>{children}</I18nContext.Provider>;
 }
 
 export function useLanguage() {

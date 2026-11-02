@@ -6,7 +6,11 @@ let memoryToken: string | null = null;
 function readCookie(name: string): string | null {
   if (typeof document === 'undefined') return null;
   const match = document.cookie.match(new RegExp('(^|;\\s*)(' + name + ')=([^;]*)'));
-  return match ? decodeURIComponent(match[3]) : null;
+  try {
+    return match ? decodeURIComponent(match[3]) : null;
+  } catch {
+    return null;
+  }
 }
 
 function writeCookie(name: string, value: string, maxAgeDays = 30): void {
@@ -21,9 +25,6 @@ function deleteCookie(name: string): void {
 }
 
 export function getAuthToken(): string | null {
-  if (memoryToken) {
-    return memoryToken;
-  }
   if (typeof window === 'undefined') {
     return null;
   }
@@ -34,7 +35,8 @@ export function getAuthToken(): string | null {
       return local;
     }
   } catch {
-    // LocalStorage unavailable/blocked
+    // Preserve an in-memory session only when browser storage is unavailable.
+    if (memoryToken) return memoryToken;
   }
   const cookie = readCookie(TOKEN_KEY) ?? readCookie(LEGACY_TOKEN_KEY);
   if (cookie) {

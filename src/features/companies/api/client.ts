@@ -51,6 +51,17 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers.set('Authorization', `Bearer ${token}`);
   }
 
+  // CloudFront signs the private Lambda origin request. Writes also need the
+  // hash of the original payload so AWS can verify that signature.
+  if (process.env.NEXT_PUBLIC_AWS_OAC === 'true' && options.method !== 'GET') {
+    const payload = typeof options.body === 'string' ? options.body : '';
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
+    headers.set(
+      'x-amz-content-sha256',
+      Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+    );
+  }
+
   const response = await fetch(endpoint, {
     ...options,
     headers

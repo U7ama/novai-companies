@@ -5,7 +5,14 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from '@/components/ui/card';
 import { Icons } from '@/components/icons';
 import { setAuthToken } from '@/features/auth/auth-store';
 import { useLanguage } from '@/features/i18n/i18n-context';
@@ -58,7 +65,7 @@ export default function SignInPage() {
             <Icons.logo className='h-6 w-6' />
           </div>
           <h1 className='text-2xl font-bold tracking-tight'>Novai CRM</h1>
-          <p className='text-sm text-muted-foreground'>B2B Companies Management</p>
+          <p className='text-sm text-muted-foreground'>{t.auth.management}</p>
         </div>
 
         <Card className='shadow-lg border-border/80'>
@@ -67,7 +74,7 @@ export default function SignInPage() {
             <CardDescription>{t.auth.subtitle}</CardDescription>
           </CardHeader>
 
-          <form action='javascript:void(0)' method='post' onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit}>
             <CardContent className='space-y-4'>
               <div className='space-y-2'>
                 <Label htmlFor='bearer-token'>{t.auth.tokenLabel}</Label>
