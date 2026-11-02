@@ -1,6 +1,5 @@
 import React from 'react';
 import { Heading } from '../ui/heading';
-import type { InfobarContent } from '@/components/ui/infobar';
 
 function PageSkeleton() {
   return (
@@ -28,7 +27,6 @@ export default function PageContainer({
   accessFallback,
   pageTitle,
   pageDescription,
-  infoContent,
   pageHeaderAction
 }: {
   children: React.ReactNode;
@@ -37,7 +35,6 @@ export default function PageContainer({
   accessFallback?: React.ReactNode;
   pageTitle?: string;
   pageDescription?: string;
-  infoContent?: InfobarContent;
   pageHeaderAction?: React.ReactNode;
 }) {
   if (!access) {
@@ -53,7 +50,6 @@ export default function PageContainer({
   }
 
   const content = isLoading ? <PageSkeleton /> : children;
-
   const hasHeader = pageTitle || pageHeaderAction;
 
   return (
@@ -63,7 +59,6 @@ export default function PageContainer({
           <Heading
             title={pageTitle ?? ''}
             description={pageDescription ?? ''}
-            infoContent={infoContent}
           />
           {pageHeaderAction && <div className='shrink-0'>{pageHeaderAction}</div>}
         </div>
