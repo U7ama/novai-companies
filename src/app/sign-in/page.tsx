@@ -15,24 +15,34 @@ import { ThemeModeToggle } from '@/components/themes/theme-mode-toggle';
 export default function SignInPage() {
   const router = useRouter();
   const { t } = useLanguage();
-  const [token, setToken] = useState('dev-token');
+  const [token, setToken] = useState('novai-bearer-token-live');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanToken = token.trim();
+  const performSignIn = (rawToken: string) => {
+    const cleanToken = rawToken.trim();
     if (!cleanToken) {
       setError(t.auth.tokenRequired);
       return;
     }
     setError('');
     setAuthToken(cleanToken);
-    router.replace('/companies');
+    if (typeof window !== 'undefined') {
+      window.location.assign('/companies');
+    } else {
+      router.replace('/companies');
+    }
   };
 
-  const handleQuickFill = () => {
-    setToken('novai-bearer-token-live');
-    setError('');
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    performSignIn(token);
+  };
+
+  const handleQuickDemoSignIn = () => {
+    const demoToken = 'novai-bearer-token-live';
+    setToken(demoToken);
+    performSignIn(demoToken);
   };
 
   return (
@@ -57,7 +67,7 @@ export default function SignInPage() {
             <CardDescription>{t.auth.subtitle}</CardDescription>
           </CardHeader>
 
-          <form onSubmit={handleSubmit}>
+          <form action='javascript:void(0)' method='post' onSubmit={handleSubmit}>
             <CardContent className='space-y-4'>
               <div className='space-y-2'>
                 <Label htmlFor='bearer-token'>{t.auth.tokenLabel}</Label>
@@ -77,24 +87,21 @@ export default function SignInPage() {
                   </p>
                 )}
               </div>
-
-              <div className='flex justify-end'>
-                <Button
-                  type='button'
-                  variant='link'
-                  size='sm'
-                  onClick={handleQuickFill}
-                  className='h-auto p-0 text-xs text-muted-foreground hover:text-primary'
-                >
-                  {t.auth.quickFill}
-                </Button>
-              </div>
             </CardContent>
 
-            <CardFooter>
+            <CardFooter className='flex flex-col gap-2.5'>
               <Button type='submit' className='w-full'>
                 <Icons.login className='mr-2 h-4 w-4' />
                 {t.auth.signInButton}
+              </Button>
+              <Button
+                type='button'
+                variant='outline'
+                onClick={handleQuickDemoSignIn}
+                className='w-full font-medium'
+              >
+                <Icons.check className='mr-2 h-4 w-4' />
+                {t.auth.quickFill} & {t.auth.signInButton}
               </Button>
             </CardFooter>
           </form>
