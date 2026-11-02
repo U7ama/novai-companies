@@ -2,6 +2,8 @@
 
 This is the Companies feature for the Novai assessment. It uses Next.js 16, React 19, TypeScript, Tailwind, TanStack Query, and nuqs. The API is built with Route Handlers and starts with 40 companies in memory.
 
+[Live demo](https://novai-companies.usamaaslam.site) | [GitHub repository](https://github.com/U7ama/novai-companies) (private)
+
 ![Companies table with search, status filtering, and sortable columns](docs/screenshots/companies-table.png)
 
 ## Running it

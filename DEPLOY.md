@@ -1,5 +1,9 @@
 # AWS demo deployment
 
+Live site: [novai-companies.usamaaslam.site](https://novai-companies.usamaaslam.site). Source: [U7ama/novai-companies](https://github.com/U7ama/novai-companies) (private).
+
+The CloudFormation stack is `novai-companies-serverless` in `us-east-1`. It manages the `novai-companies-web` function, the `novai-companies-state` table, and CloudFront distribution `E1QC0C9L6ZNWS4`.
+
 The app runs on Lambda behind CloudFront. There is no EC2 instance, load balancer, NAT gateway, paid build service, warmer, or provisioned concurrency. The function starts when a request needs it. CloudFront caches the versioned JavaScript and CSS files.
 
 ## Data and authentication
