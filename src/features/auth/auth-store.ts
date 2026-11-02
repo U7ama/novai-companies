@@ -13,6 +13,7 @@ export function setAuthToken(token: string): void {
   memoryToken = token;
   if (typeof window !== 'undefined') {
     localStorage.setItem(TOKEN_KEY, token);
+    window.dispatchEvent(new Event('novai-auth-change'));
   }
 }
 
@@ -20,6 +21,7 @@ export function clearAuthToken(): void {
   memoryToken = null;
   if (typeof window !== 'undefined') {
     localStorage.removeItem(TOKEN_KEY);
+    window.dispatchEvent(new Event('novai-auth-change'));
   }
 }
 
